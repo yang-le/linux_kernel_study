@@ -1,63 +1,63 @@
-ï»¿LATCH				= 11930				# å®šæ—¶å™¨åˆå§‹è®¡æ•°å€¼ï¼ˆ10msï¼‰
-SCRN_SEL			= 0x18				# å±å¹•æ˜¾ç¤ºå†…å­˜æ®µé€‰æ‹©ç¬¦
-TSS0_SEL			= 0x20				# ä»»åŠ¡0çš„TSSæ®µé€‰æ‹©ç¬¦
-LDT0_SEL			= 0x28				# ä»»åŠ¡0çš„LDTæ®µé€‰æ‹©ç¬¦
-TSS1_SEL			= 0x30				# ä»»åŠ¡1çš„TSSæ®µé€‰æ‹©ç¬¦
-LDT1_SEL			= 0x38				# ä»»åŠ¡1çš„LDTæ®µé€‰æ‹©ç¬¦
+LATCH				= 11930				# ¶¨Ê±Æ÷³õÊ¼¼ÆÊýÖµ£¨10ms£©
+SCRN_SEL			= 0x18				# ÆÁÄ»ÏÔÊ¾ÄÚ´æ¶ÎÑ¡Ôñ·û
+TSS0_SEL			= 0x20				# ÈÎÎñ0µÄTSS¶ÎÑ¡Ôñ·û
+LDT0_SEL			= 0x28				# ÈÎÎñ0µÄLDT¶ÎÑ¡Ôñ·û
+TSS1_SEL			= 0x30				# ÈÎÎñ1µÄTSS¶ÎÑ¡Ôñ·û
+LDT1_SEL			= 0x38				# ÈÎÎñ1µÄLDT¶ÎÑ¡Ôñ·û
 .text
 startup_32:
 
 # 15----------3|--0
 #   		   |T R
-#	æè¿°ç¬¦ç´¢å¼• |I P
+#	ÃèÊö·ûË÷Òý |I P
 #			   |  L
 # -------------|---
-		movl $0x10, %eax				# 0x10ä¸ºGDTè¡¨ç´¢å¼•ä¸º2çš„ä½ç½®ï¼Œæƒé™ä½ä¸º0x00ï¼Œä¹Ÿå°±æ˜¯æ•°æ®æ®µï¼ŒåŸºåœ°å€ä¸º0x0
+		movl $0x10, %eax				# 0x10ÎªGDT±íË÷ÒýÎª2µÄÎ»ÖÃ£¬È¨ÏÞÎ»Îª0x00£¬Ò²¾ÍÊÇÊý¾Ý¶Î£¬»ùµØÖ·Îª0x0
 		mov %ax, %ds
 
-# lssï¼Œè‹¥REGæ˜¯16ä½çš„ï¼Œåˆ™æºæ“ä½œæ•°å¿…é¡»æ˜¯32ä½çš„ï¼›
-# è‹¥REGæ˜¯32ä½çš„ï¼Œåˆ™æºæ“ä½œæ•°å¿…é¡»æ˜¯48ä½çš„ã€‚
-# å°†ä½Žä½é€REGï¼Œå°†é«˜ä½é€SSï¼ŒREGä¸èƒ½æ˜¯æ®µå¯„å­˜å™¨
-		lss init_stack, %esp			# è¿™é‡Œå°†SSä¹Ÿè®¾ä¸ºäº†0x10ï¼Œå‚è§åŽé¢çš„init_stack
+# lss£¬ÈôREGÊÇ16Î»µÄ£¬ÔòÔ´²Ù×÷Êý±ØÐëÊÇ32Î»µÄ£»
+# ÈôREGÊÇ32Î»µÄ£¬ÔòÔ´²Ù×÷Êý±ØÐëÊÇ48Î»µÄ¡£
+# ½«µÍÎ»ËÍREG£¬½«¸ßÎ»ËÍSS£¬REG²»ÄÜÊÇ¶Î¼Ä´æÆ÷
+		lss init_stack, %esp			# ÕâÀï½«SSÒ²ÉèÎªÁË0x10£¬²Î¼ûºóÃæµÄinit_stack
 
-# ä¸Šé¢çš„æ“ä½œåº”è¯¥å°±æ˜¯ä¸ºäº†ä¸‹é¢çš„ä¸¤ä¸ªcallåšDSå’ŒSSçš„å‡†å¤‡
-# è·³åˆ°çŽ°åœ¨è¿™ä¸ªæ–°çš„ä½ç½®ä¹‹åŽï¼Œé‡æ–°è®¾ç½®IDTå’ŒGDT
-# ä½†å®žé™…ä¸Šï¼Œå¯ä»¥æ²¿ç”¨boot.sä¸­çš„è®¾ç½®ï¼Œè¿™é‡Œè¿›è¡Œè®¾ç½®æ˜¯ä¸ºäº†è®©ç¨‹åºæ›´æ¸…æ™°ï¼Œä¹Ÿä¸ŽLinuxçš„å¤„ç†ä¿æŒä¸€è‡´
-		call setup_idt					# è®¾ç½®IDTï¼Œæ‰€æœ‰ä¸­æ–­éƒ½ç”±é»˜è®¤ä¸­æ–­å¤„ç†ç¨‹åºå¤„ç†
-		call setup_gdt					# è®¾ç½®GDT
+# ÉÏÃæµÄ²Ù×÷Ó¦¸Ã¾ÍÊÇÎªÁËÏÂÃæµÄÁ½¸öcall×öDSºÍSSµÄ×¼±¸
+# Ìøµ½ÏÖÔÚÕâ¸öÐÂµÄÎ»ÖÃÖ®ºó£¬ÖØÐÂÉèÖÃIDTºÍGDT
+# µ«Êµ¼ÊÉÏ£¬¿ÉÒÔÑØÓÃboot.sÖÐµÄÉèÖÃ£¬ÕâÀï½øÐÐÉèÖÃÊÇÎªÁËÈÃ³ÌÐò¸üÇåÎú£¬Ò²ÓëLinuxµÄ´¦Àí±£³ÖÒ»ÖÂ
+		call setup_idt					# ÉèÖÃIDT£¬ËùÓÐÖÐ¶Ï¶¼ÓÉÄ¬ÈÏÖÐ¶Ï´¦Àí³ÌÐò´¦Àí
+		call setup_gdt					# ÉèÖÃGDT
 
-		movl $0x10, %eax				# æ”¹å˜GDTåŽï¼Œé‡æ–°åŠ è½½æ‰€æœ‰æ®µå¯„å­˜å™¨
+		movl $0x10, %eax				# ¸Ä±äGDTºó£¬ÖØÐÂ¼ÓÔØËùÓÐ¶Î¼Ä´æÆ÷
 		mov %ax, %ds
 		mov %ax, %es
 		mov %ax, %fs
 		mov %ax, %gs
 		lss init_stack, %esp
 
-# è®¾ç½®8253å®šæ—¶å™¨èŠ¯ç‰‡
-# 8253é‡‡ç”¨å‡1è®¡æ•°çš„æ–¹å¼
-# ç«¯å£0~2åˆ†åˆ«å¯¹åº”è®¡æ•°å™¨0~2ï¼Œç«¯å£3æ˜¯æŽ§åˆ¶å¯„å­˜å™¨ï¼Œç«¯å£åœ°å€åœ¨0x40 ~ 0x43
+# ÉèÖÃ8253¶¨Ê±Æ÷Ð¾Æ¬
+# 8253²ÉÓÃ¼õ1¼ÆÊýµÄ·½Ê½
+# ¶Ë¿Ú0~2·Ö±ð¶ÔÓ¦¼ÆÊýÆ÷0~2£¬¶Ë¿Ú3ÊÇ¿ØÖÆ¼Ä´æÆ÷£¬¶Ë¿ÚµØÖ·ÔÚ0x40 ~ 0x43
 
-# æŽ§åˆ¶å¯„å­˜å™¨
+# ¿ØÖÆ¼Ä´æÆ÷
 # 7------0
 # SSRRMMMB
 # CCLL   C
 # 1010210D
 # --------
-# SC é€šé“0 ~ 2ï¼Œ3ä¸ç”¨
-# RL è¯»å†™æ–¹å¼ 0ï¼Œè®¡æ•°å™¨é”å­˜ï¼›1ï¼Œåªè¯»å†™ä½Ž8ä½ï¼›2ï¼Œåªè¯»å†™é«˜8ä½ï¼›3ï¼Œå…¨16ä½
-# M  è®¡æ•°æ–¹å¼ 0 ~ 5ï¼Œåˆ†åˆ«ä¸ºâ€œè®¡æ•°ç»“æŸåˆ™ä¸­æ–­â€ã€â€œå•è„‰å†²å‘ç”Ÿå™¨â€ã€â€œé€ŸçŽ‡æ³¢å‘ç”Ÿå™¨â€ã€â€œæ–¹æ³¢å‘ç”Ÿå™¨â€ã€â€œè½¯ä»¶è§¦å‘æ–¹å¼è®¡æ•°â€ã€â€œç¡¬ä»¶è§¦å‘æ–¹å¼è®¡æ•°â€
-# BCD 0ï¼Œè®¡æ•°å€¼ä¸ºäºŒè¿›åˆ¶æ•°ï¼›1ï¼Œè®¡æ•°å€¼ä¸ºBCDç¼–ç çš„æ•°
+# SC Í¨µÀ0 ~ 2£¬3²»ÓÃ
+# RL ¶ÁÐ´·½Ê½ 0£¬¼ÆÊýÆ÷Ëø´æ£»1£¬Ö»¶ÁÐ´µÍ8Î»£»2£¬Ö»¶ÁÐ´¸ß8Î»£»3£¬È«16Î»
+# M  ¼ÆÊý·½Ê½ 0 ~ 5£¬·Ö±ðÎª¡°¼ÆÊý½áÊøÔòÖÐ¶Ï¡±¡¢¡°µ¥Âö³å·¢ÉúÆ÷¡±¡¢¡°ËÙÂÊ²¨·¢ÉúÆ÷¡±¡¢¡°·½²¨·¢ÉúÆ÷¡±¡¢¡°Èí¼þ´¥·¢·½Ê½¼ÆÊý¡±¡¢¡°Ó²¼þ´¥·¢·½Ê½¼ÆÊý¡±
+# BCD 0£¬¼ÆÊýÖµÎª¶þ½øÖÆÊý£»1£¬¼ÆÊýÖµÎªBCD±àÂëµÄÊý
 
-		movb $0x36, %al					# é€šé“0ï¼Œå…¨16ä½è¯»å†™ï¼Œè®¡æ•°æ–¹å¼3ï¼šâ€œæ–¹æ³¢å‘ç”Ÿå™¨â€ï¼ŒäºŒè¿›åˆ¶è®¡æ•°
-		movl $0x43,	%edx				# æŽ§åˆ¶ç«¯å£åœ°å€
-		outb %al, %dx					# ç«¯å£è¾“å‡º
+		movb $0x36, %al					# Í¨µÀ0£¬È«16Î»¶ÁÐ´£¬¼ÆÊý·½Ê½3£º¡°·½²¨·¢ÉúÆ÷¡±£¬¶þ½øÖÆ¼ÆÊý
+		movl $0x43,	%edx				# ¿ØÖÆ¶Ë¿ÚµØÖ·
+		outb %al, %dx					# ¶Ë¿ÚÊä³ö
 
-# è¾“å‡ºé¢‘çŽ‡ = CLKé¢‘çŽ‡ / è®¡æ•°å€¼ = 1.193MHz / 11930 = 1193000 / 11930 = 100Hz
-# æ‰€ä»¥ï¼Œè®¡æ•°å€¼å¦‚æžœè®¾ä¸º11930ï¼Œæ¯éš”10msï¼Œå°±ä¼šæ”¶åˆ°ä¸€ä¸ªæ—¶é’Ÿä¸­æ–­
+# Êä³öÆµÂÊ = CLKÆµÂÊ / ¼ÆÊýÖµ = 1.193MHz / 11930 = 1193000 / 11930 = 100Hz
+# ËùÒÔ£¬¼ÆÊýÖµÈç¹ûÉèÎª11930£¬Ã¿¸ô10ms£¬¾Í»áÊÕµ½Ò»¸öÊ±ÖÓÖÐ¶Ï
 		movl $LATCH, %eax				# $LATCH = 11930
-		movl $0x40, %edx				# è®¡æ•°å™¨0çš„ç«¯å£åœ°å€
-		outb %al, %dx					# å…¨16ä½è¾“å‡ºéœ€åˆ†ä¸¤æ¬¡ï¼Œå…ˆä½ŽåŽé«˜
+		movl $0x40, %edx				# ¼ÆÊýÆ÷0µÄ¶Ë¿ÚµØÖ·
+		outb %al, %dx					# È«16Î»Êä³öÐè·ÖÁ½´Î£¬ÏÈµÍºó¸ß
 		movb %ah, %al
 		outb %al, %dx
 		
-# æŽ¥ä¸‹æ¥è®¾ç½®æ—¶é’Ÿä¸­æ–­å¤„ç†ç¨‹åº
+# ½ÓÏÂÀ´ÉèÖÃÊ±ÖÓÖÐ¶Ï´¦Àí³ÌÐò
