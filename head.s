@@ -47,7 +47,6 @@ startup_32:
 # RL 读写方式 0，计数器锁存；1，只读写低8位；2，只读写高8位；3，全16位
 # M  计数方式 0 ~ 5，分别为“计数结束则中断”、“单脉冲发生器”、“速率波发生器”、“方波发生器”、“软件触发方式计数”、“硬件触发方式计数”
 # BCD 0，计数值为二进制数；1，计数值为BCD编码的数
-
 		movb $0x36, %al					# 通道0，全16位读写，计数方式3：“方波发生器”，二进制计数
 		movl $0x43,	%edx				# 控制端口地址
 		outb %al, %dx					# 端口输出
@@ -59,5 +58,144 @@ startup_32:
 		outb %al, %dx					# 全16位输出需分两次，先低后高
 		movb %ah, %al
 		outb %al, %dx
-		
+
+# 中断门描述符
+# 31------24----19------16|----|11-------8|7------0
+# |	         	          | D  |  		  |		  |
+# |  过程入口点偏移值 	  |PP 0|  1110	  | ALL	  |	4
+# |	  31..16 			  | L S|  TYPE	  |	0	  |
+# ------------------------|----|----------|--------
+# |						  |					  	  |
+# |	段选择符			  | 过程入口点偏移值  	  |	0
+# |						  | 15..0			 	  |
+# ------------------------|------------------------
+# S=0 为系统描述符，包括LDT描述符，TSS描述符，调用（TYPE=12）、中断（TYPE=14）、陷阱（TYPE=15）、任务（TYPE=5）门描述符
+
 # 接下来设置时钟中断处理程序
+		movl $0x00080000, %eax			# 段选择符0x0008，系统代码段
+		movw $timer_interrupt, %ax		# 过程入口点偏移值
+		movw $0x8E00, %dx				# P=1，DPL=0，S=0，TYPE=14
+		movl $0x08, %ecx				# 中断向量号为8，与BIOS的设定一致
+
+# disp(base, index, scale)格式，地址为base + index * scale + disp
+# 这里，idt中的每一项都是8字节，而%ecx表示第8项，该命令将idt的第8项的有效地址（即段内偏移量）装入%esi
+		lea idt(, %ecx, 8), %esi		# %esi为中断向量8的描述符首地址
+		movl %eax, (%esi)				# 设置该描述符
+		movl %edx, 4(%esi)
+		
+# 接下来，系统调用陷阱门
+# 陷阱门类似于中断门，但陷阱门处理过程中不会清除IF标志位，即陷阱门处理中可以接收中断
+		movw $system_interrupt, %ax		# 系统调用处理程序入口
+		movw $0xef00, %dx				# P=1, DPL=3, S=0, TYPE=15
+		movl $0x80, %ecx				# 系统调用的中断向量号为0x80
+		lea idt(, %ecx, 8), %esi		# 取idt表中索引为0x80的位置
+		movl %eax, (%esi)				# 设置描述符
+		movl %edx, 4(%esi)
+		
+# OK，准备启动任务0，先来个人造堆栈，最后用iret（中断返回指令）来跳到任务0
+# 中断时，如果中断是在高特权级上执行，则会发生任务堆栈切换，此时会先将当前任务的SS和ESP压入新栈中；
+# 然后，会依次向栈中压入EFLAGS、CS、EIP、有时还有错误码，IRET会把他们弹出去赋给对应的寄存器
+		pushfl							# 复位EFLAGS中的嵌套任务标志
+		andl $0xffffbfff, (%esp)		# 因为我们这个任务不是被其他任务调起来的，执行结束后不需要返回父任务
+		popfl							# 使用pushfl将EFLAGS压入栈中，修改，然后弹出
+		movl $TSS0_SEL, %eax			# 也许因为这里的操作数是32位的
+		ltr %ax							# TR寄存器永远指向当前任务的TSS段，其中存放的是16位的段选择符，ltr指令用来加载这个寄存器
+		movl $LDT0_SEL, %eax			# 类似地，设置LDT表基地址
+		lldt %ax
+		movl $0, current				# 当前任务，任务0
+		
+# 中断处理时，处理器会将IF标志复位。而中断处理最后的IRET指令会利用压入栈中的EFLAGS将IF置位。
+# 所以，我们需要
+		sti								# 置EFLAGS中的IF标志位，准备人造堆栈
+		pushl $0x17						# 任务0的局部数据段（堆栈段），在LDT的第2项，特权级3
+		pushl $init_stack				# 堆栈指针（也可以直接压入ESP）
+		pushfl							# EFLAGS
+		pushl $0x0f						# 任务0局部空间的代码段选择符，在LDT的第1项，特权级3
+		pushl $task0					# 任务0的EIP，入口地址
+		iret							# 跳走~，这条执行之后就切换到任务0了
+		
+# 剩下的是一些子程序
+# 首先是设置gdt和idt的
+setup_gdt:
+		lgdt ldgt_opcode				# ldgt命令接受48位的操作数
+		ret
+
+setup_idt:
+		lea ignore_int, %edx
+		movl $0x00080000, %eax			# 段选择符0x0008，系统代码段
+		movw %dx, %ax					# ignore_int 过程入口点偏移值
+		movw $0x8E00, %dx				# P=1，DPL=0，S=0，TYPE=14
+		lea idt, %edi					# %edi是idt首地址
+		mov $256, %ecx					# 以下重复256次
+rp_idt:
+		movl %eax, (%edi)				# 填写idt中的一项
+		movl %edx, 4(%edi)
+		addl $8, %edi					# 移动到下一项
+		dec %ecx						# 计数值减1
+		jne rp_idt						# 计数值不为0则重复
+		lidt lidt_opcode				# 最后加载idt基址寄存器
+		ret
+		
+# 接下来，是显示字符串的子程序。
+# 取当前光标位置，并把al中的字符显示在屏幕上（80x25）
+write_char:
+		push %gs						# 保存要用到的寄存器，eax由调用者负责保存
+		pushl %ebx
+		mov $SCRN_SEL, %ebx				# 让gs指向显示内存段（0xb8000）
+		mov %bx, %gs
+		movl src_loc, %bx				# 从src_loc变量中取当前的显示位置
+		shl $1, %ebx					# 对应的显示内存位置=显示位置*2
+		movb %al, %gs:(%ebx)			# 送去显示
+		shr $1, %ebx					# 再恢复%ebx本来的值
+		incl %ebx						# 显示位置加1
+		cmpl $2000, %ebx				# 如果一屏满，则复位为0，注意AT&T的cmp指令是后面的操作数-前面的操作数，结果影响标志位
+		jb 1f							# 一屏不满则向前跳到标号1，不清零
+		movl $0, %ebx					# 清零
+1:		movl %ebx, scr_loc				# 更新scr_loc变量
+		popl %ebx						# 弹栈
+		pop %gs
+		ret
+
+# 然后是中断处理程序
+# ignore_int是默认的中断处理程序
+.align 2								# 强制此处位于4字节内存边界
+ignore_int:
+		push %ds
+		pushl %eax
+		movl $0x10, %eax				# 让ds指向内核数据段，因为中断程序属于内核
+		mov %ax, %ds
+		movl $67, %eax					# 显示‘C’
+		call write_char
+		popl %eax
+		pop %ds
+		iret							# 注意这里是中断返回
+		
+# 定时中断处理程序
+.align 2
+timer_interrupt:
+		push %ds
+		pushl %eax
+		movl $0x10, %eax				# 让ds指向内核数据段，因为中断程序属于内核
+		mov %ax, %ds
+
+# 必须在中断处理程序结束之前发送EOI命令，告知8259A中断处理结束
+# 否则8259A会认为中断处理一直在进行，下次同级别以及低级别的中断将无法得到响应
+# 但，软中断由于是直接调用了中断处理程序，不经过8259A的处理，所以不用发送EOI
+# 发送EOI之后，也不是肯定就会被打断，得看当前的中断处理程序是否允许嵌套，即IF标志位是否置位
+# 默认是不允许的，除非在中断处理程序中用sti指令打开
+# 所以，我怀疑默认中断处理程序写得有点问题，因为没有发送EOI；系统调用中断处理没问题，因为是软中断
+		movb $0x20, %al					# 立刻允许其他硬件中断，即向8259A发送EOI命令
+		outb %al, $0x20
+		movl $1, %eax
+		cmpl %eax, current				# 如果当前是任务1，则去执行任务0
+		je 1f
+		movl %eax, current				# 否则执行任务1
+
+# 可以用jmp或call指令来跳转到或调用一个任务，Linux采用的是jmp方式
+		ljmp $TSS1_SEL, $0				# 偏移在这里是没有用的，但要写上，真正的EIP值是由处理器从TSS段中加载的
+		jmp 2f
+1:		movl $0, current				# 更新current，ljmp到任务几就更新为几
+		ljmp $TSS0_SEL, $0
+2:		popl %eax
+		pop %ds
+		iret
