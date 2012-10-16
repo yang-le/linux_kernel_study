@@ -199,3 +199,57 @@ timer_interrupt:
 2:		popl %eax
 		pop %ds
 		iret
+		
+# 系统调用中断int 0x80，显示字符
+.align 2
+system_interrupt:
+		push %ds
+		pushl %edx
+		pushl %ecx
+		pushl %ebx
+		pushl %eax
+		movl $0x10, %edx				# DS指向内核数据段
+		mov %dx, %ds
+		call write_char					# 调用显示字符字程序，显示AL中的字符
+		popl %eax
+		popl %ebx
+		popl %ecx
+		popl %edx
+		pop %ds
+		iret
+		
+/******************************************************************************/
+current:.long 0							# 当前任务号（0或1）
+scr_loc:.long 0							# 当前屏幕显示位置（从左上到右下）
+
+.align 2
+lidt_opcode:							# lidt的48位操作数
+		.word (end_gdt - gdt) - 1		# 表长度
+		.long gdt						# 基地址
+		
+.align 3
+idt:	.fill 256, 8, 0					# 一个空的idt表，256项，每项8字节，初始化为0
+
+# GDT描述符
+# 31------24----19------16|----|11-------8|7------0
+# |	         D A          | D  |  0EWA	  |		  |
+# |	BASE    G/0V  LIMIT   |PP S|  TYPE	  | BASE  |	4
+# |	31..24   B L  19..16  | L  |  1CRA	  |	23..16|
+# ------------------------|----|----------|--------
+# |						  |					  	  |
+# |	BASE				  | LIMIT			  	  |	0
+# |	15..0				  | 15..0			 	  |
+# ------------------------|------------------------
+gdt:	.quad	0x0000000000000000		# 空描述符
+
+# 内核代码段描述符，选择符0x08
+		.word	0x07ff					# 段限长 2K * 4K = 8M
+		.word	0x0000					# 段基址低位（15..0）
+		.word	0x9a00					# 1001 1010 0000 0000 存在，DPL=0，S=1，TYPE=0xa（代码段，非一致，可读，未访问），段基址（23..16）=0
+		.word	0x00c0					# 0000 0000 1100 0000 G=1（颗粒度4K），D=1（32位段）
+
+# 内核数据段描述符，选择符0x10		
+		.quad	0x00c09200000007ff		# TYPE=0x2（数据段，向上扩展，可读写，未访问）
+
+# 显示内存段描述符，选择符0x18		
+		.quad	0x00c0920b80000002		# TYPE=0x2，基地址=0xb8000，段限长 2 * 4K = 8K
