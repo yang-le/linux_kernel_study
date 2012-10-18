@@ -117,7 +117,7 @@ startup_32:
 # 剩下的是一些子程序
 # 首先是设置gdt和idt的
 setup_gdt:
-		lgdt ldgt_opcode				# ldgt命令接受48位的操作数
+		lgdt lgdt_opcode				# ldgt命令接受48位的操作数
 		ret
 
 setup_idt:
@@ -158,7 +158,7 @@ write_char:
 
 # 然后是中断处理程序
 # ignore_int是默认的中断处理程序
-.align 2								# 强制此处位于4字节内存边界
+.align 2								# 强制此处位于4字节内存边界，为了与旧时的中断向量表兼容？（因为中断向量x4得到中断程序入口）
 ignore_int:
 		push %ds
 		pushl %eax
@@ -224,11 +224,15 @@ scr_loc:.long 0							# 当前屏幕显示位置（从左上到右下）
 
 .align 2
 lidt_opcode:							# lidt的48位操作数
-		.word (end_gdt - gdt) - 1		# 表长度
+		.word 256 * 8 - 1				# 表限长的值+基地址应该得到表中最后一个有效的地址，因此限长值应该减一
+		.long idt						# 基地址
+
+lgdt_opcode:							# lgdt的48位操作数
+		.word (end_gdt - gdt) - 1		# 表限长
 		.long gdt						# 基地址
 		
-.align 3
-idt:	.fill 256, 8, 0					# 一个空的idt表，256项，每项8字节，初始化为0
+.align 3								# IDT、GDT、LDT等表的基地址应该8字节对齐，以达到最佳处理器性能
+idt:	.fill 256, 8, 0					# 一个空的idt表，固定256项，每项8字节，初始化为0
 
 # GDT描述符
 # 31------24----19------16|----|11-------8|7------0
@@ -243,13 +247,62 @@ idt:	.fill 256, 8, 0					# 一个空的idt表，256项，每项8字节，初始化为0
 gdt:	.quad	0x0000000000000000		# 空描述符
 
 # 内核代码段描述符，选择符0x08
-		.word	0x07ff					# 段限长 2K * 4K = 8M
+		.word	0x07ff					# 段长度（注意需要加1） 2K * 4K = 8M
 		.word	0x0000					# 段基址低位（15..0）
-		.word	0x9a00					# 1001 1010 0000 0000 存在，DPL=0，S=1，TYPE=0xa（代码段，非一致，可读，未访问），段基址（23..16）=0
+		.word	0x9a00					# 1001 1010 0000 0000 存在，DPL=0，S=1（非系统），TYPE=0xa（代码段，非一致，可读，未访问），段基址（23..16）=0
 		.word	0x00c0					# 0000 0000 1100 0000 G=1（颗粒度4K），D=1（32位段）
 
 # 内核数据段描述符，选择符0x10		
 		.quad	0x00c09200000007ff		# TYPE=0x2（数据段，向上扩展，可读写，未访问）
 
 # 显示内存段描述符，选择符0x18		
-		.quad	0x00c0920b80000002		# TYPE=0x2，基地址=0xb8000，段限长 2 * 4K = 8K
+		.quad	0x00c0920b80000002		# TYPE=0x2，基地址=0xb8000，段限长 3 * 4K = 12K
+		
+# TSS0段描述符，选择符0x20
+		.word	0x0068					# 段长度 0x69 = 105 字节（段长度可以稍大一些）
+		.word	tss0					# 段基址低位（15..0）
+		.word	0xe900					# 1110 1001 0000 0000 存在，DPL=3，S=0（系统），TYPE=0x9（32位TSS，可用），段基址（23..16）=0
+		.word	0x0						# G=0
+		
+# LDT0段描述符，选择符0x28
+		.word	0x40, ldt0, 0xe200, 0x0	# 段限长 0x41 = 65 字节（通常大于24字节即可），TYPE=0x2（LDT）
+
+# TSS1段描述符，选择符0x30
+		.word	0x68, tss1, 0xe900, 0x0
+		
+# LDT1段描述符，选择符0x38
+		.word	0x40, ldt1, 0xe200, 0x0
+end_gdt:
+
+		.fill	128, 4, 0				# 设置堆栈，128 x 4 = 512字节，初始化为0
+init_stack:								# 栈指针ESP在高地址处
+		.long	init_stack				# LSS的参数，低位送ESP
+		.word	0x10					# 高位送SS，栈段同内核数据段
+
+# 任务0的LDT和TSS
+.align 3
+ldt0:
+		.quad	0x0000000000000000		# 第一个，空描述符
+
+# 局部代码段描述符，选择符0x0f
+		.word	0x03ff					# 段限长 1K * 4K = 4M
+		.word	0x0000					# 段基址低位（15..0）
+		.word	0xfa00					# 1111 1010 0000 0000 存在，DPL=3，S=1（非系统），TYPE=0xa（代码段）
+		.word	0x00c0					# 0000 0000 1100 0000 G=1（颗粒度4K），D=1（32位段）
+
+# 局部数据段描述符，选择符0x17
+		.quad	0x00c0f200000003ff		# TYPE=0x2（数据段）
+		
+tss0:									# 任务状态段为固定结构，共104字节，如下
+		.long 0							/* back link */
+		.long krn_stk0, 0x10			/* esp0, ss0 */
+		.long 0, 0, 0, 0, 0				/* esp1, ss1, esp2, ss2, cr3 */
+		.long 0, 0, 0, 0, 0				/* eip, eflags, eax, ecx, edx */
+		.long 0, 0, 0, 0, 0				/* ebx, esp, ebp, esi, edi */
+		.long 0, 0, 0, 0, 0, 0			/* es, cs, ss, ds, fs, gs */
+		.long LDT0_SEL, 0x8000000		/* ldt, trace bitmap */
+		
+		.fill 128, 4, 0					# 任务0的内核栈空间
+krn_stk0:
+
+# 任务1的LDT和TSS
