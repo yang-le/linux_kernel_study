@@ -306,3 +306,44 @@ tss0:									# 任务状态段为固定结构，共104字节，如下
 krn_stk0:
 
 # 任务1的LDT和TSS
+.align 3
+ldt1:
+		.quad 0x0000000000000000		# 空描述符
+		.quad 0x00c0fa00000003ff		# 局部代码段
+		.quad 0x00c0f200000003ff		# 局部数据段
+		
+tss1:
+		.long 0							/* back link */
+		.long krn_stk1, 0x10			/* esp0, ss0 */
+		.long 0, 0, 0, 0, 0				/* esp1, ss1, esp2, ss2, cr3 */
+		.long task1, 0x200				/* eip, eflags */	
+		.long 0, 0, 0, 0				/* eax, ecx, edx, edx */
+		.long usr_stk1, 0, 0, 0			/* esp, ebp, esi, edi */
+		.long 0x17, 0x0f, 0x17			/* es, cs, ss */
+		.long 0x17, 0x17, 0x17			/* ds, fs, gs */
+		.long LDT0_SEL, 0x8000000		/* ldt, trace bitmap */
+		
+		.fill 128, 4, 0					# 任务1的内核栈空间
+krn_stk1:
+
+# 最后，是任务0和任务1的程序
+task0:
+		movl $0x17, %eax				# 设置局部数据段
+		movw %ax, %ds
+		movl $65, %al					# 显示字符‘A’
+		int $0x80
+		movl $0xfff, %ecx				# 延时一段时间
+1:
+		loop 1b
+		jmp task0						# 重复执行
+
+task1:
+		movl $66, %al					# 显示字符‘B’
+		int $0x80
+		movl $0xfff, %ecx				# 延时一段时间
+1:
+		loop 1b
+		jmp task1						# 重复执行
+		
+		.fill 128, 4, 0					# 任务1的用户栈空间
+usr_stk1:
