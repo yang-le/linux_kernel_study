@@ -143,7 +143,7 @@ write_char:
 		pushl %ebx
 		mov $SCRN_SEL, %ebx				# 让gs指向显示内存段（0xb8000）
 		mov %bx, %gs
-		movl src_loc, %bx				# 从src_loc变量中取当前的显示位置
+		movl scr_loc, %ebx				# 从scr_loc变量中取当前的显示位置
 		shl $1, %ebx					# 对应的显示内存位置=显示位置*2
 		movb %al, %gs:(%ebx)			# 送去显示
 		shr $1, %ebx					# 再恢复%ebx本来的值
@@ -158,7 +158,7 @@ write_char:
 
 # 然后是中断处理程序
 # ignore_int是默认的中断处理程序
-.align 2								# 强制此处位于4字节内存边界，为了与旧时的中断向量表兼容？（因为中断向量x4得到中断程序入口）
+.align 4								# 强制此处位于4字节内存边界，为了与旧时的中断向量表兼容？（因为中断向量x4得到中断程序入口）
 ignore_int:
 		push %ds
 		pushl %eax
@@ -171,7 +171,7 @@ ignore_int:
 		iret							# 注意这里是中断返回
 		
 # 定时中断处理程序
-.align 2
+.align 4
 timer_interrupt:
 		push %ds
 		pushl %eax
@@ -201,7 +201,7 @@ timer_interrupt:
 		iret
 		
 # 系统调用中断int 0x80，显示字符
-.align 2
+.align 4
 system_interrupt:
 		push %ds
 		pushl %edx
@@ -222,7 +222,7 @@ system_interrupt:
 current:.long 0							# 当前任务号（0或1）
 scr_loc:.long 0							# 当前屏幕显示位置（从左上到右下）
 
-.align 2
+.align 4
 lidt_opcode:							# lidt的48位操作数
 		.word 256 * 8 - 1				# 表限长的值+基地址应该得到表中最后一个有效的地址，因此限长值应该减一
 		.long idt						# 基地址
@@ -231,7 +231,7 @@ lgdt_opcode:							# lgdt的48位操作数
 		.word (end_gdt - gdt) - 1		# 表限长
 		.long gdt						# 基地址
 		
-.align 3								# IDT、GDT、LDT等表的基地址应该8字节对齐，以达到最佳处理器性能
+.align 8								# IDT、GDT、LDT等表的基地址应该8字节对齐，以达到最佳处理器性能
 idt:	.fill 256, 8, 0					# 一个空的idt表，固定256项，每项8字节，初始化为0
 
 # GDT描述符
@@ -280,7 +280,7 @@ init_stack:								# 栈指针ESP在高地址处
 		.word	0x10					# 高位送SS，栈段同内核数据段
 
 # 任务0的LDT和TSS
-.align 3
+.align 8
 ldt0:
 		.quad	0x0000000000000000		# 第一个，空描述符
 
@@ -306,7 +306,7 @@ tss0:									# 任务状态段为固定结构，共104字节，如下
 krn_stk0:
 
 # 任务1的LDT和TSS
-.align 3
+.align 8
 ldt1:
 		.quad 0x0000000000000000		# 空描述符
 		.quad 0x00c0fa00000003ff		# 局部代码段
@@ -330,7 +330,7 @@ krn_stk1:
 task0:
 		movl $0x17, %eax				# 设置局部数据段
 		movw %ax, %ds
-		movl $65, %al					# 显示字符‘A’
+		movb $65, %al					# 显示字符‘A’
 		int $0x80
 		movl $0xfff, %ecx				# 延时一段时间
 1:
@@ -338,7 +338,7 @@ task0:
 		jmp task0						# 重复执行
 
 task1:
-		movl $66, %al					# 显示字符‘B’
+		movb $66, %al					# 显示字符‘B’
 		int $0x80
 		movl $0xfff, %ecx				# 延时一段时间
 1:
