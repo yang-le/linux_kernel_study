@@ -4,6 +4,7 @@ TSS0_SEL			= 0x20				# 任务0的TSS段选择符
 LDT0_SEL			= 0x28				# 任务0的LDT段选择符
 TSS1_SEL			= 0x30				# 任务1的TSS段选择符
 LDT1_SEL			= 0x38				# 任务1的LDT段选择符
+.global startup_32
 .text
 startup_32:
 
