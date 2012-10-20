@@ -1,15 +1,16 @@
 ! 该文件编译后生成操作系统的引导扇区
 !
 ! 编译方法：
-!	AS86.EXE -0 -a -o boot.o boot.s
-!	LD86.EXE -0 -s -o boot boot.o
+!	as86 -0 -a -o boot.o boot.s
+!	ld86 -0 -s -o boot boot.o
 ! 编译选项说明：
 ! 	'-0' 生成8086的16位目标程序
 ! 	'-a' 生成与GNU as和ld部分兼容的代码
 ! 	'-s' 去除最后生成的可执行文件中的符号信息
 ! 	'-o' 指定输出文件的名称
 !
-! AS86.EXE和LD86.EXE是Bruce Evans编写的Intel 8086、80386汇编编译程序和链接程序
+! as86和ld86是Bruce Evans编写的Intel 8086、80386汇编编译程序和链接程序
+! 可以从linux软件包管理器中下载bin86软件包获得它们
 !
 BOOTSEG = 0x07c0						! 引导扇区被加载到0x7c00
 SYSSEG 	= 0x1000						! 内核先加载到0x10000处，然后移动到0x0处

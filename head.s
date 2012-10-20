@@ -1,3 +1,16 @@
+# 该文件为32位保护模式代码
+#
+# 编译方法：
+#	as -o head.o head.s
+#	ld -s -x -M -Ttext 0x0 -e startup_32 -o system head.o > System.map
+# 编译选项说明：
+# 	'-s' 去除最后生成的可执行文件中的符号信息
+# 	'-x' 删除所有局部符号
+# 	'-M' 生成link Map到标准输出
+#	'-Ttext' 指定text段的起始位置
+#	'-e' 指定程序入口
+# 	'-o' 指定输出文件的名称
+#
 LATCH				= 11930				# 定时器初始计数值（10ms）
 SCRN_SEL			= 0x18				# 屏幕显示内存段选择符
 TSS0_SEL			= 0x20				# 任务0的TSS段选择符
